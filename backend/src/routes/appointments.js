@@ -80,6 +80,16 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
+    // Fetch doctor to get their current consultationFee
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { consultationFee: true },
+    });
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found.' });
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         patientId,
@@ -87,6 +97,7 @@ router.post('/', authenticate, async (req, res) => {
         appointmentDate: appDate,
         reason: reason || '',
         status: 'PENDING',
+        consultationFee: doctor.consultationFee,
       },
     });
 

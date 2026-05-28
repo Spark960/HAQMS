@@ -55,12 +55,16 @@ app.use((err, req, res, next) => {
 });
 
 // Listen on port
-app.listen(PORT, () => {
-  console.log(`===================================================`);
-  console.log(`   HAQMS BACKEND SERVER IS RUNNING ON PORT ${PORT}`);
-  console.log(`   ENVIRONMENT: ${process.env.NODE_ENV}`);
-  console.log(`===================================================`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`===================================================`);
+    console.log(`   HAQMS BACKEND SERVER IS RUNNING ON PORT ${PORT}`);
+    console.log(`   ENVIRONMENT: ${process.env.NODE_ENV}`);
+    console.log(`===================================================`);
+  });
+}
+
+module.exports = app;
 
 // Catch unhandled rejections
 process.on('unhandledRejection', (reason, promise) => {

@@ -3,28 +3,35 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/common/Navbar';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Users, CalendarDays, Activity, Search, Sparkles, UserPlus, 
   Trash2, ClipboardList, TrendingUp, DollarSign, Award, Clock,
   ArrowRight, ShieldAlert, CheckCircle, Volume2
 } from 'lucide-react';
+import useDebounce from '@/hooks/useDebounce';
 
 export default function Dashboard() {
-  const { user, token, API_BASE_URL, logout } = useAuth();
+  const { user, token, API_BASE_URL, logout, loading } = useAuth();
   const router = useRouter();
 
   // Navigation Guard
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       router.push('/login');
     }
-  }, [user]);
-
-  if (!user) return null;
+  }, [user, loading]);
 
   // Global State
-  const [activeTab, setActiveTab] = useState(user.role === 'ADMIN' ? 'reports' : user.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
+  const [activeTab, setActiveTab] = useState(user?.role === 'ADMIN' ? 'reports' : user?.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
+
+  // Fix: Sync activeTab once user loads from localStorage
+  useEffect(() => {
+    if (user?.role) {
+      setActiveTab(user.role === 'ADMIN' ? 'reports' : user.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
+    }
+  }, [user?.role]);
 
   // ==========================================
   // STATE FOR RECEPTIONIST WORKFLOWS
@@ -59,6 +66,8 @@ export default function Dashboard() {
   const [doctorAppointments, setDoctorAppointments] = useState([]);
   const [doctorQueue, setDoctorQueue] = useState([]);
   const [selectedPatientHistory, setSelectedPatientHistory] = useState(null);
+  const [doctorApptSearch, setDoctorApptSearch] = useState('');
+  const [doctorApptStatus, setDoctorApptStatus] = useState('All');
 
   // ==========================================
   // STATE FOR ADMIN WORKFLOWS
@@ -71,13 +80,15 @@ export default function Dashboard() {
   // RECEPTIONIST FUNCTIONS
   // ==========================================
   
+  const debouncedPatientSearch = useDebounce(patientSearch, 500);
+
   // Fetch Patients List
-  const fetchPatients = async (page = 1) => {
+  const fetchPatients = async (page = 1, signal = null, search = patientSearch) => {
     setPatientsLoading(true);
     try {
-      // Inefficient memory pagination called from client
-      const res = await fetch(`${API_BASE_URL}/patients?page=${page}&limit=5&search=${patientSearch}&gender=${patientGender}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${API_BASE_URL}/patients?page=${page}&limit=5&search=${search}&gender=${patientGender}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal
       });
       const data = await res.json();
       if (data.success) {
@@ -89,18 +100,21 @@ export default function Dashboard() {
         });
       }
     } catch (e) {
-      console.error(e);
+      if (e.name !== 'AbortError') {
+        console.error(e);
+      }
     } finally {
       setPatientsLoading(false);
     }
   };
 
-  // Trigger Patient List Fetch (Every keystroke trigger re-renders parent! - Performance bug)
   useEffect(() => {
-    if (user.role === 'RECEPTIONIST' || user.role === 'ADMIN') {
-      fetchPatients(1);
+    if (user?.role === 'RECEPTIONIST' || user?.role === 'ADMIN') {
+      const controller = new AbortController();
+      fetchPatients(1, controller.signal, debouncedPatientSearch);
+      return () => controller.abort();
     }
-  }, [patientSearch, patientGender]);
+  }, [debouncedPatientSearch, patientGender]);
 
   // Fetch Doctors for booking drop-down
   const fetchDoctorsDropdown = async () => {
@@ -196,7 +210,7 @@ export default function Dashboard() {
       if (res.ok) {
         setBookingMessage('Success: Appointment booked successfully!');
         setBookingReason('');
-        if (user.role === 'DOCTOR') fetchDoctorWorklist();
+        if (user?.role === 'DOCTOR') fetchDoctorWorklist();
       } else {
         setBookingMessage(`Error: ${data.error || 'Failed to book'}`);
       }
@@ -240,7 +254,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (res.ok) {
         setCheckinMessage(`Checked in! Generated Token #${data.token.tokenNumber}`);
-        if (user.role === 'DOCTOR') fetchDoctorWorklist();
+        if (user?.role === 'DOCTOR') fetchDoctorWorklist();
       } else {
         setCheckinMessage(`Error check-in: ${data.error}`);
       }
@@ -253,7 +267,8 @@ export default function Dashboard() {
   // DOCTOR WORKFLOW FUNCTIONS
   // ==========================================
   const fetchDoctorWorklist = async () => {
-    if (user.role !== 'DOCTOR') return;
+    if (user?.role !== 'DOCTOR') return;
+
     try {
       // Find matching doctor from doctors dropdown using user ID link
       const matchedDoc = doctorsList.find(d => d.userId === user.id);
@@ -281,7 +296,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (user.role === 'DOCTOR' && doctorsList.length > 0) {
+    if (user?.role === 'DOCTOR' && doctorsList.length > 0) {
       fetchDoctorWorklist();
     }
   }, [doctorsList]);
@@ -363,6 +378,8 @@ export default function Dashboard() {
       console.error(e);
     }
   };
+
+  if (loading || !user) return <div className="min-h-screen flex items-center justify-center">Loading Application...</div>;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -894,7 +911,7 @@ export default function Dashboard() {
                       without optional chaining! If medicalHistory is null (which is the case for Batman, Clark Kent, etc.),
                       this code throws: "Cannot read properties of null (reading 'toUpperCase')" and crashes the app! */}
                   <p className="text-slate-700 dark:text-slate-300 leading-5 text-sm font-semibold">
-                    {selectedPatientHistory.medicalHistory.toUpperCase()}
+                    {selectedPatientHistory?.medicalHistory?.toUpperCase() ?? 'NO MEDICAL HISTORY RECORDED'}
                   </p>
                 </div>
 

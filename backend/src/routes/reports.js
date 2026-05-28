@@ -27,7 +27,8 @@ router.get('/doctor-stats', authenticate, async (req, res) => {
         totalAppointments,
         completedAppointments,
         cancelledAppointments,
-        queueTokensCount
+        queueTokensCount,
+        revenueAggregate,
       ] = await Promise.all([
         prisma.appointment.count({ where: { doctorId: doc.id } }),
         prisma.appointment.count({ where: { doctorId: doc.id, status: 'COMPLETED' } }),
@@ -38,11 +39,13 @@ router.get('/doctor-stats', authenticate, async (req, res) => {
             createdAt: { gte: today },
           },
         }),
+        prisma.appointment.aggregate({
+          where: { doctorId: doc.id, status: 'COMPLETED' },
+          _sum: { consultationFee: true },
+        }),
       ]);
 
-      // Optimize revenue: use mathematical calculation rather than fetching the whole list
-      // Note: This relies on the current fee. Historical fee tracking would require a schema change.
-      const revenue = completedAppointments * doc.consultationFee;
+      const revenue = revenueAggregate._sum.consultationFee || 0;
 
       return {
         id: doc.id,

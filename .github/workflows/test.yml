@@ -1,0 +1,71 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: haqms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/package-lock.json
+
+    - name: Install Backend Dependencies
+      run: npm ci
+      working-directory: ./backend
+
+    - name: Run Prisma Migrations
+      run: npx prisma migrate deploy
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/haqms_test?schema=public
+
+    - name: Run Backend Integration Tests
+      run: npm run test
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/haqms_test?schema=public
+        JWT_SECRET: ci_test_secret_key_123
+
+    - name: Install Frontend Dependencies
+      run: npm ci
+      working-directory: ./frontend
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+      working-directory: ./frontend
+
+    - name: Build Frontend
+      run: npm run build
+      working-directory: ./frontend
+
+    - name: Run Frontend E2E Tests
+      run: npm run test:e2e
+      working-directory: ./frontend

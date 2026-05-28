@@ -32,6 +32,22 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
+
+    // Global fetch interceptor to catch 401 Unauthorized responses (due to shortened JWT expiry)
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401) {
+        console.warn('Authentication token expired or invalid (401). Forcing logout...');
+        // Note: we only trigger logout on 401. 403 Forbidden shouldn't log out.
+        logout();
+      }
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch; // Cleanup interceptor on unmount
+    };
   }, []);
 
   const login = async (email, password) => {
