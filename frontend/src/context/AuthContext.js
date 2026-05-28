@@ -12,10 +12,9 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const router = useRouter();
 
-  // Read from environment variables to support deployment
-  const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const API_BASE_URL = envApiUrl
-    ? (envApiUrl.endsWith('/api') ? envApiUrl : `${envApiUrl}/api`)
+  // Read from environment variables to support deployment (inline for Next.js webpack replacement)
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+    ? (process.env.NEXT_PUBLIC_API_URL.endsWith('/api') ? process.env.NEXT_PUBLIC_API_URL : `${process.env.NEXT_PUBLIC_API_URL}/api`)
     : 'http://localhost:5000/api';
 
   useEffect(() => {
