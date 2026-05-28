@@ -71,5 +71,7 @@ jobs:
       working-directory: ./frontend
 
     - name: Deploy to Vercel
-      # This step ONLY runs if the tests above it successfully pass
+      env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
