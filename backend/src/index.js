@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 
 //did you guys really think I wouldn't notice this? lol, it was a good one.
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://lokesh-haqms-f.vercel.app/'], 
+    origin: ['http://localhost:3000', 'https://lokesh-haqms-f.vercel.app'], 
     credentials: true // Important if you use cookies/sessions
 }));
 
