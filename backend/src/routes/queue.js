@@ -46,39 +46,53 @@ router.post('/checkin', authenticate, async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Fetch current maximum token number for this doctor today
-    const maxTokenResult = await prisma.queueToken.aggregate({
-      where: {
-        doctorId,
-        createdAt: { gte: today },
-      },
-      _max: {
-        tokenNumber: true,
-      },
-    });
+    const maxRetries = 3;
+    let newToken = null;
 
-    const currentMax = maxTokenResult._max.tokenNumber || 0;
-    const nextTokenNumber = currentMax + 1;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        newToken = await prisma.$transaction(async (tx) => {
+          // Lock the doctor row to serialize concurrent requests for the same doctor
+          await tx.$executeRawUnsafe('SELECT id FROM "Doctor" WHERE id = $1 FOR UPDATE', doctorId);
 
-    // PERFORMANCE/CONCURRENCY BUG: Artificial sleep to widen the race condition window.
-    // In production under microservices or high load, network delay does this naturally.
-    // Junior developer comment: "Adding sleep to make sure db registers the record correctly before moving forward"
-    await new Promise((resolve) => setTimeout(resolve, 350));
+          // Fetch current maximum token number
+          const maxTokenResult = await tx.queueToken.aggregate({
+            where: {
+              doctorId,
+              createdAt: { gte: today },
+            },
+            _max: {
+              tokenNumber: true,
+            },
+          });
 
-    // 2. Insert new token
-    const newToken = await prisma.queueToken.create({
-      data: {
-        tokenNumber: nextTokenNumber,
-        patientId,
-        doctorId,
-        appointmentId: appointmentId || null,
-        status: 'WAITING',
-      },
-      include: {
-        patient: true,
-        doctor: true,
-      },
-    });
+          const currentMax = maxTokenResult._max.tokenNumber || 0;
+          const nextTokenNumber = currentMax + 1;
+
+          // Insert new token
+          return await tx.queueToken.create({
+            data: {
+              tokenNumber: nextTokenNumber,
+              patientId,
+              doctorId,
+              appointmentId: appointmentId || null,
+              status: 'WAITING',
+            },
+            include: {
+              patient: true,
+              doctor: true,
+            },
+          });
+        });
+
+        // If transaction succeeds, break out of the retry loop
+        break;
+      } catch (err) {
+        if (attempt === maxRetries) throw err;
+        // Basic exponential backoff if deadlock or serialization error occurs
+        await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+      }
+    }
 
     res.status(201).json({
       message: 'Checked in successfully. Token generated.',
