@@ -69,3 +69,7 @@ jobs:
     - name: Run Frontend E2E Tests
       run: npm run test:e2e
       working-directory: ./frontend
+
+    - name: Deploy to Vercel
+      # This step ONLY runs if the tests above it successfully pass
+      run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
