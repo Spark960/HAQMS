@@ -38,9 +38,12 @@ export const AuthProvider = ({ children }) => {
     window.fetch = async (...args) => {
       const response = await originalFetch(...args);
       if (response.status === 401) {
-        console.warn('Authentication token expired or invalid (401). Forcing logout...');
-        // Note: we only trigger logout on 401. 403 Forbidden shouldn't log out.
-        logout();
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+        if (!url.includes('/auth/login') && !url.includes('/auth/register')) {
+          console.warn('Authentication token expired or invalid (401). Forcing logout...');
+          // Note: we only trigger logout on 401. 403 Forbidden shouldn't log out.
+          logout();
+        }
       }
       return response;
     };

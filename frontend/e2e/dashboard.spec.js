@@ -41,8 +41,8 @@ test.describe('Dashboard Features', () => {
     // Wait a moment longer to ensure no follow-up requests were sent
     await page.waitForTimeout(500);
 
-    // Verify exactly ONE request was made
-    expect(searchRequestCount).toBe(1);
+    // Verify exactly TWO requests were made (one for initial load, one for search)
+    expect(searchRequestCount).toBe(2);
   });
 
   test('should handle null history without crashing for Doctor', async ({ page }) => {

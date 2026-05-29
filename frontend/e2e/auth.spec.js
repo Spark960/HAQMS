@@ -6,8 +6,10 @@ test.describe('Global 401 Interceptor', () => {
       const request = route.request();
       if (request.url().includes('/api/auth/')) {
         route.continue();
-      } else {
+      } else if (request.url().includes('search=trigger')) {
         route.fulfill({ status: 401, json: { error: 'Token expired' } });
+      } else {
+        route.fulfill({ status: 200, json: { success: true, data: [], patients: [], pagination: {} } });
       }
     });
 
