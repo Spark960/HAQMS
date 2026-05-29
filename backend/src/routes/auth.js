@@ -5,7 +5,9 @@ const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-secret-key-12345!!!';
+// Require JWT_SECRET from environment — refuse to start if not configured
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('FATAL: JWT_SECRET environment variable is not set');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -31,7 +33,9 @@ router.post('/register', async (req, res) => {
         email,
         password: hashedPassword,
         name,
-        role: role || 'RECEPTIONIST',
+        // FIXED: Prevent privilege escalation — public registration is restricted to
+        // non-admin roles only. ADMIN accounts must be created by existing admins.
+        role: (role && role !== 'ADMIN') ? role : 'RECEPTIONIST',
       },
     });
 

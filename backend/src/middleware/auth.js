@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-secret-key-12345!!!';
+// Require JWT_SECRET from environment — refuse to start if not configured
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('FATAL: JWT_SECRET environment variable is not set');
 
 // Authentication middleware
 const authenticate = (req, res, next) => {
@@ -44,9 +46,8 @@ const authorize = (roles = []) => {
   };
 };
 
-// MISSING AUTHORIZATION CHECK: This middleware is meant for Admin actions but is empty
-// or fails to check the role, allowing any authenticated user (e.g. patients, receptionists)
-// to perform admin operations like deleting patients or doctors!
+// FIXED: Legacy admin-only middleware now properly enforces ADMIN role check.
+// Returns 403 Forbidden for any non-admin authenticated user.
 const authorizeAdminOnlyLegacy = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized.' });

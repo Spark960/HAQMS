@@ -38,9 +38,9 @@ model User {
   doctor Doctor?
 }
 
-// SCHEMA BUG: No unique constraint on (doctorId, appointmentDate).
-// This permits double-booking the same physician at the exact same time slot.
-// A proper constraint would be: @@unique([doctorId, appointmentDate])
+// FIXED: Duplicate booking prevention enforced via a Partial Unique Index
+// (unique_active_booking) on (doctorId, appointmentDate) WHERE status != 'CANCELLED',
+// applied as a raw SQL migration in prisma/migrations/.
 model Doctor {
   id              String   @id @default(uuid())
   userId          String?  @unique
@@ -54,8 +54,7 @@ model Doctor {
   availableTo     String   @default("17:00")
   createdAt       DateTime @default(now())
 
-  // MISSING INDEX: No index on department or specialization.
-  // Filtering/searching by these columns does full table scans at scale.
+  // FIXED: Added indices on department and specialization to prevent full table scans.
   @@index([department])
   @@index([specialization])
 
@@ -70,7 +69,7 @@ model Patient {
   phoneNumber    String
   age            Int
   gender         String
-  medicalHistory String?  // Nullable — intentional crash trigger for frontend bug
+  medicalHistory String?  // Nullable — handled safely on frontend with optional chaining
   createdAt      DateTime @default(now())
 
   appointments Appointment[]
@@ -93,8 +92,7 @@ model Appointment {
   @@index([patientId])
   @@index([appointmentDate])
 
-  // MISSING INDEX: No index on (doctorId, status) — important for worklist queries.
-  // MISSING INDEX: No index on patientId foreign key.
+  // FIXED: Added indices on (doctorId, status), patientId, and appointmentDate.
   queueTokens QueueToken[]
 }
 
@@ -113,8 +111,7 @@ model QueueToken {
   @@index([doctorId, createdAt])
   @@index([status])
 
-  // MISSING INDEX: No index on (doctorId, createdAt) — used in daily token aggregation.
-  // MISSING INDEX: No index on status — used in frequent status filter queries.
-  // SCHEMA BUG: No unique constraint on (doctorId, tokenNumber, date) —
-  // race condition in checkin route can produce duplicate token numbers for the same doctor+day.
+  // FIXED: Added indices on (doctorId, createdAt) and status for query performance.
+  // Race condition on (doctorId, tokenNumber) mitigated via FOR UPDATE row lock
+  // inside a Prisma $transaction with retry logic in the checkin route.
 }

@@ -7,9 +7,9 @@ const prisma = new PrismaClient();
 
 // GET /api/appointments
 // List all appointments
-// PERFORMANCE BUG: Classic N+1 Query Issue!
-// Instead of using Prisma's include, it loops through each appointment and executes
-// individual select statements for Patient and Doctor details.
+// FIXED: N+1 Query issue resolved.
+// Previously looped through each appointment executing individual queries for Patient and Doctor.
+// Now uses Prisma's include to fetch all relations in a single query with JOINs.
 router.get('/', authenticate, async (req, res) => {
   try {
     const { doctorId, status } = req.query;
@@ -49,9 +49,10 @@ router.get('/', authenticate, async (req, res) => {
 
 // POST /api/appointments
 // Book an appointment
-// DESIGN BUG: Duplicate-prone schema. No unique index blocks duplicate appointment bookings.
-// In this API, we have a half-hearted verification that is easily bypassed or logically flawed,
-// allowing multiple bookings for the exact same date and doctor.
+// FIXED: Duplicate booking prevention implemented.
+// Application-level check combined with a database-level Partial Unique Index
+// (unique_active_booking) on (doctorId, appointmentDate) WHERE status != 'CANCELLED'.
+// Concurrent duplicate requests are rejected at the database constraint layer.
 router.post('/', authenticate, async (req, res) => {
   try {
     const { patientId, doctorId, appointmentDate, reason } = req.body;
