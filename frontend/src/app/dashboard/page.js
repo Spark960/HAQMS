@@ -109,12 +109,12 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (user?.role === 'RECEPTIONIST' || user?.role === 'ADMIN') {
+    if (token && (user?.role === 'RECEPTIONIST' || user?.role === 'ADMIN')) {
       const controller = new AbortController();
       fetchPatients(1, controller.signal, debouncedPatientSearch);
       return () => controller.abort();
     }
-  }, [debouncedPatientSearch, patientGender]);
+  }, [debouncedPatientSearch, patientGender, user, token]);
 
   // Fetch Doctors for booking drop-down
   const fetchDoctorsDropdown = async () => {
@@ -130,8 +130,10 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchDoctorsDropdown();
-  }, []);
+    if (token) {
+      fetchDoctorsDropdown();
+    }
+  }, [token]);
 
   // Handle Patient Registration
   const handleRegisterPatient = async (e) => {
@@ -299,7 +301,7 @@ export default function Dashboard() {
     if (user?.role === 'DOCTOR' && doctorsList.length > 0) {
       fetchDoctorWorklist();
     }
-  }, [doctorsList]);
+  }, [doctorsList, user]);
 
   // Update token status (WAITING -> CALLING -> COMPLETED / SKIPPED)
   const handleUpdateQueueStatus = async (tokenId, newStatus) => {
